@@ -133,7 +133,7 @@ def write_csv(data, a, b, c, d, file):
                          data[d]))
 
 
-# write log
+# write log to file
 def write_log(text, err, link):
     with open('log.csv', 'a') as log:
         writer = csv.writer(log, delimiter=';')
