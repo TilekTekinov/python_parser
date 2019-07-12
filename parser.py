@@ -37,20 +37,14 @@ def get_html(url, proxies):
 def get_category_link(html):
     soup = BeautifulSoup(html, "html.parser")
     category = soup.find_all(attrs={'class': 'category-top'})
-    try:
-        for category_one in category:
+    for index, category_one in enumerate(category):
+        try:
             data = {'category-link': category_one.get('href'),
-                    'category-name': category_one.getText().strip().split('->')[0],
-                    'c': '',
-                    'd': ''}
-    except AttributeError:
-        data = {'category-link': '',
-                'category-name': '',
-                'c': '',
-                'd': '',
-                'e': '',
-                'f': ''}
-    write_csv(data, 'category-link', 'category-name', 'c', 'd', 'e', 'f', 'category-list-url.csv')
+                    'category-name': category_one.getText().strip().split('->')[0]}
+        except AttributeError:
+            data = {'category-link': '',
+                    'category-name': ''}
+        write_category(data, index + 1)
 
 
 # get category with proxy and catch Exception
@@ -96,23 +90,28 @@ def get_category_links():
 
 # Start pars subcategories ************
 # get subcategories link and name
-def get_subcategory_link(html, category_link):
+def get_subcategory_link(html, category_link, i, index):
     soup = BeautifulSoup(html, "html.parser")
     try:
         category = soup.find_all(attrs={'class': 'category-products'})
         for category_one in category:
-            data = {'category-link': category_link,
-                    'subcategory-link': category_one.get('href'),
-                    'subcategory-name': category_one.getText().strip().replace(u'\xa0', u',').split(',')[1],
-                    'd': ''}
+            try:
+                data = {'category-link': category_link,
+                        'subcategory-link': category_one.get('href'),
+                        'subcategory-name': category_one.getText().strip().replace(u'\xa0', u',').split(',')[1]}
+            except AttributeError:
+                data = {'category-link': category_link,
+                        'subcategory-link': '',
+                        'subcategory-name': ''}
+            write_subcategory(data, index, i)
+            index += 1
     except AttributeError:
         data = {'category-link': category_link,
                 'subcategory-link': '',
-                'subcategory-name': '',
-                'd': '',
-                'e': '',
-                'f': ''}
-    write_csv(data, 'category-top', 'subcategory-link', 'subcategory-name', 'd', 'e', 'f', 'subcategory-list-url.csv')
+                'subcategory-name': ''}
+        write_subcategory(data, index, i)
+        index += 1
+    return index
 
 
 # get subcategories with proxy and catch Exception
@@ -120,41 +119,42 @@ def get_subcategory_links():
     category_link = get_csv('category-list-url.csv')
     proxies = get_proxies('hideme_proxy.csv')
     i = 0
+    index = 1
     while True:
         try:
             if i == len(category_link) - 1:
                 break
-            resp, proxy = get_html(category_link[i][0], proxies)
+            resp, proxy = get_html(category_link[i][2], proxies)
             if 13000 >= int(resp.headers['Content-Length']):
                 raise KeyError
             resp.raise_for_status()
             if 'Bad Request' in resp.text:
                 raise requests.HTTPError
-            get_subcategory_link(resp.text, category_link[i][0])
+            index = get_subcategory_link(resp.text, category_link[i][2], i + 1, index)
             i += 1
         except requests.HTTPError as http_err:
             if resp.status_code == 403:
-                write_log('403 error because of proxy', proxy, category_link[i][0])
+                write_log('403 error because of proxy', proxy, category_link[i][2])
             elif resp.status_code == 404:
-                write_log('404 error because of proxy', proxy, category_link[i][0])
+                write_log('404 error because of proxy', proxy, category_link[i][2])
             elif 'Bad Request' in resp.text:
-                write_log('Bad Request', resp.text.strip(), category_link[i][0])
-            write_log('HTTP error occurred', http_err, category_link[i][0])
+                write_log('Bad Request', resp.text.strip(), category_link[i][2])
+            write_log('HTTP error occurred', http_err, category_link[i][2])
             continue
         except requests.ConnectionError as conn_err:
-            write_log('Connection error occurred', conn_err, category_link[i][0])
+            write_log('Connection error occurred', conn_err, category_link[i][2])
             continue
         except ConnectionResetError as res_err:
-            write_log('ConnectionResetError error occurred', res_err, category_link[i][0])
+            write_log('ConnectionResetError error occurred', res_err, category_link[i][2])
             continue
         except requests.exceptions.ChunkedEncodingError as con_err:
-            write_log('ChunkedEncodingError error occurred', con_err, category_link[i][0])
+            write_log('ChunkedEncodingError error occurred', con_err, category_link[i][2])
             continue
         except requests.exceptions.ReadTimeout as time_err:
-            write_log('Time error occurred', time_err, category_link[i][0])
+            write_log('Time error occurred', time_err, category_link[i][2])
             continue
         except KeyError:
-            write_log('Bad proxy', resp.headers, category_link[i][0])
+            write_log('Bad proxy', resp.headers, category_link[i][2])
             continue
 # End pars subcategories **************
 
@@ -201,7 +201,7 @@ def get_page_count(subcategory_link):
 
 
 # get product link and price
-def get_product_link(html, subcategory_link, i):
+def get_product_link(html, index, sub_cat_id):
     soup = BeautifulSoup(html, "html.parser")
     prod_info = soup.find_all(class_="product-col")
     for prod_info_one in prod_info:
@@ -220,17 +220,15 @@ def get_product_link(html, subcategory_link, i):
                 price = prod_info_one.find(class_='productSpecialPrice').getText()
             except AttributeError:
                 price = ''
-        data = {'subcategory': subcategory_link + '?sort=2d&page=' + str(i),
-                'link': link,
-                'price': price,
-                'd': '',
-                'e': '',
-                'f': ''}
-        write_csv(data, 'subcategory', 'link', 'price', 'd', 'e', 'f', 'product_list_url.csv')
+        data = {'link': link,
+                'price': price}
+        write_product_list(data, index, sub_cat_id)
+        index += 1
+    return index
 
 
 # get product from all subcategories page
-def get_product_links(subcategory_link):
+def get_product_links(subcategory_link, index, sub_cat_id):
     all_page = get_page_count(subcategory_link)
     proxies = get_proxies('hideme_proxy.csv')
     sum_proxies = len(list(get_proxies('hideme_proxy.csv')))
@@ -249,7 +247,7 @@ def get_product_links(subcategory_link):
                 resp.raise_for_status()
                 if 'Bad Request' in resp.text:
                     raise requests.HTTPError
-                get_product_link(resp.text, subcategory_link, i)
+                index = get_product_link(resp.text, index, sub_cat_id)
                 break
             except requests.HTTPError as http_err:
                 if resp.status_code == 403:
@@ -275,19 +273,21 @@ def get_product_links(subcategory_link):
             except KeyError:
                 write_log('Bad proxy', resp.headers, subcategory_link)
                 continue
+    return index
 
 
 # read subcategory links from file
 def get_all_product_links():
     subcategory_links = get_csv('subcategory-list-url.csv')
+    i = 1
     for subcategory_link in subcategory_links:
-        get_product_links(subcategory_link[1])
+        i = get_product_links(subcategory_link[2], i, subcategory_link[0])
 # End pars all products from subcategories ****************
 
 
 # Start pars all products data ******************
 # get product name, price, details, size, image link
-def get_product_data(html, product_link):
+def get_product_data(html, product_link, i, index):
     soup = BeautifulSoup(html, "html.parser")
     detail, size, image = [], [], []
     try:
@@ -319,13 +319,26 @@ def get_product_data(html, product_link):
             image.append('http://www.i28.com/' + image_link.find('a').get('lpic'))
     except AttributeError:
         image.append('')
-    data = {'product-link': product_link,
-            'product-name': name,
-            'product-price': price,
-            'product-detail': detail,
-            'product-size': size,
-            'product-image': image}
-    write_csv(data, 'product-link', 'product-name', 'product-price', 'product-detail', 'product-size', 'product-image', 'product-list.csv')
+    try:
+        data = {'product-link': product_link,
+                'product-name': name,
+                'product-price': price,
+                'product-weight': detail[1],
+                'product-manufacturer': detail[3],
+                'product-id': detail[0],
+                'product-size': size,
+                'product-image': image}
+        write_product_data(data, index, i)
+    except IndexError:
+        data = {'product-link': product_link,
+                'product-name': name,
+                'product-price': price,
+                'product-weight': '',
+                'product-manufacturer': '',
+                'product-id': '',
+                'product-size': size,
+                'product-image': image}
+        write_product_data(data, index, i)
 
 
 # get product data
@@ -348,7 +361,7 @@ def get_all_product_data():
                 resp.raise_for_status()
                 if 'Bad Request' in resp.text:
                     raise requests.HTTPError
-                get_product_data(resp.text, product_link[1])
+                get_product_data(resp.text, product_link[1], product_link[3], product_link[0])
                 break
             except requests.HTTPError as http_err:
                 if resp.status_code == 403:
@@ -374,6 +387,8 @@ def get_all_product_data():
             except KeyError:
                 write_log('Bad proxy', resp.headers, product_link[1])
                 continue
+            except IndexError:
+                get_product_data(resp.text, product_link[1], '', '')
 # End pars all products data ******************
 
 
@@ -387,16 +402,37 @@ def get_csv(file):
     return data
 
 
-# write to file
-def write_csv(data, a, b, c, d, e, f, file):
-    with open(file, 'a') as name:
-        writer = csv.writer(name, delimiter=';')
-        writer.writerow((data[a],
-                         data[b],
-                         data[c],
-                         data[d],
-                         data[e],
-                         data[f]))
+def write_category(data, index):
+    with open('category-list-url.csv', 'a') as f:
+        writer = csv.writer(f, delimiter=';')
+        writer.writerow((index, data['category-name'], data['category-link']))
+
+
+def write_subcategory(data, index, i):
+    with open('subcategory-list-url.csv', 'a') as f:
+        writer = csv.writer(f, delimiter=';')
+        writer.writerow((index, data['subcategory-name'], data['subcategory-link'], i))
+
+
+def write_product_list(data, index, i):
+    with open('product_list_url.csv', 'a') as f:
+        writer = csv.writer(f, delimiter=';')
+        writer.writerow((index, data['link'], data['price'], i))
+
+
+def write_product_data(data, index, i):
+    with open('product-list.csv', 'a') as f:
+        writer = csv.writer(f, delimiter=';')
+        writer.writerow((index,
+                         data['product-id'],
+                         data['product-link'],
+                         data['product-name'],
+                         data['product-price'],
+                         data['product-weight'],
+                         data['product-manufacturer'],
+                         data['product-size'],
+                         data['product-image'],
+                         i))
 
 
 # write log to file
@@ -411,12 +447,12 @@ def main():
     start = datetime.now()
     print('Start: ', start)
 
-    get_category_links()
-
-    get_subcategory_links()
-
-    get_all_product_links()
-
+    # get_category_links()
+    #
+    # get_subcategory_links()
+    #
+    # get_all_product_links()
+    #
     get_all_product_data()
 
     end = datetime.now()
