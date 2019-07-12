@@ -54,11 +54,14 @@ def get_category_link(html):
 
 
 # get category with proxy and catch Exception
-def get_category_links(base_url):
+def get_category_links():
+    base_url = 'http://www.i28.com/jordan-%E4%B9%94%E4%B8%B9-c-995/'
     proxies = get_proxies('hideme_proxy.csv')
     while True:
         try:
             resp, proxy = get_html(base_url, proxies)
+            if 13000 >= int(resp.headers['Content-Length']):
+                raise KeyError
             resp.raise_for_status()
             if 'Bad Request' in resp.text:
                 raise requests.HTTPError
@@ -76,8 +79,17 @@ def get_category_links(base_url):
         except requests.ConnectionError as conn_err:
             write_log('Connection error occurred', conn_err, base_url)
             continue
+        except ConnectionResetError as res_err:
+            write_log('ConnectionResetError error occurred', res_err, base_url)
+            continue
+        except requests.exceptions.ChunkedEncodingError as con_err:
+            write_log('ChunkedEncodingError error occurred', con_err, base_url)
+            continue
         except requests.exceptions.ReadTimeout as time_err:
             write_log('Time error occurred', time_err, base_url)
+            continue
+        except KeyError:
+            write_log('Bad proxy', resp.headers, base_url)
             continue
 # End pars category *************
 
@@ -113,6 +125,8 @@ def get_subcategory_links():
             if i == len(category_link) - 1:
                 break
             resp, proxy = get_html(category_link[i][0], proxies)
+            if 13000 >= int(resp.headers['Content-Length']):
+                raise KeyError
             resp.raise_for_status()
             if 'Bad Request' in resp.text:
                 raise requests.HTTPError
@@ -130,8 +144,17 @@ def get_subcategory_links():
         except requests.ConnectionError as conn_err:
             write_log('Connection error occurred', conn_err, category_link[i][0])
             continue
+        except ConnectionResetError as res_err:
+            write_log('ConnectionResetError error occurred', res_err, category_link[i][0])
+            continue
+        except requests.exceptions.ChunkedEncodingError as con_err:
+            write_log('ChunkedEncodingError error occurred', con_err, category_link[i][0])
+            continue
         except requests.exceptions.ReadTimeout as time_err:
             write_log('Time error occurred', time_err, category_link[i][0])
+            continue
+        except KeyError:
+            write_log('Bad proxy', resp.headers, category_link[i][0])
             continue
 # End pars subcategories **************
 
@@ -143,6 +166,8 @@ def get_page_count(subcategory_link):
     while True:
         try:
             resp, proxy = get_html(subcategory_link + '?sort=2d&page=' + str(1), proxies)
+            if 13000 >= int(resp.headers['Content-Length']):
+                raise KeyError
             resp.raise_for_status()
             if 'Bad Request' in resp.text:
                 raise requests.HTTPError
@@ -161,8 +186,17 @@ def get_page_count(subcategory_link):
         except requests.ConnectionError as conn_err:
             write_log('Connection error occurred', conn_err, subcategory_link)
             continue
+        except ConnectionResetError as res_err:
+            write_log('ConnectionResetError error occurred', res_err, subcategory_link)
+            continue
+        except requests.exceptions.ChunkedEncodingError as con_err:
+            write_log('ChunkedEncodingError error occurred', con_err, subcategory_link)
+            continue
         except requests.exceptions.ReadTimeout as time_err:
             write_log('Time error occurred', time_err, subcategory_link)
+            continue
+        except KeyError:
+            write_log('Bad proxy', resp.headers, subcategory_link)
             continue
 
 
@@ -210,6 +244,8 @@ def get_product_links(subcategory_link):
                     proxies = get_proxies('hideme_proxy.csv')
                     count = 0
                 resp, proxy = get_html(subcategory_link + '?sort=2d&page=' + str(i), proxies)
+                if 13000 >= int(resp.headers['Content-Length']):
+                    raise KeyError
                 resp.raise_for_status()
                 if 'Bad Request' in resp.text:
                     raise requests.HTTPError
@@ -227,8 +263,17 @@ def get_product_links(subcategory_link):
             except requests.ConnectionError as conn_err:
                 write_log('Connection error occurred', conn_err, subcategory_link)
                 continue
+            except ConnectionResetError as res_err:
+                write_log('ConnectionResetError error occurred', res_err, subcategory_link)
+                continue
+            except requests.exceptions.ChunkedEncodingError as con_err:
+                write_log('ChunkedEncodingError error occurred', con_err, subcategory_link)
+                continue
             except requests.exceptions.ReadTimeout as time_err:
                 write_log('Time error occurred', time_err, subcategory_link)
+                continue
+            except KeyError:
+                write_log('Bad proxy', resp.headers, subcategory_link)
                 continue
 
 
@@ -240,6 +285,8 @@ def get_all_product_links():
 # End pars all products from subcategories ****************
 
 
+# Start pars all products data ******************
+# get product name, price, details, size, image link
 def get_product_data(html, product_link):
     soup = BeautifulSoup(html, "html.parser")
     detail, size, image = [], [], []
@@ -281,10 +328,7 @@ def get_product_data(html, product_link):
     write_csv(data, 'product-link', 'product-name', 'product-price', 'product-detail', 'product-size', 'product-image', 'product-list.csv')
 
 
-class MyException(Exception):
-    pass
-
-
+# get product data
 def get_all_product_data():
     product_links = get_csv('product_list_url.csv')
     proxies = get_proxies('hideme_proxy.csv')
@@ -300,7 +344,7 @@ def get_all_product_data():
                     count = 0
                 resp, proxy = get_html(product_link[1], proxies)
                 if 13000 >= int(resp.headers['Content-Length']):
-                    raise MyException
+                    raise KeyError
                 resp.raise_for_status()
                 if 'Bad Request' in resp.text:
                     raise requests.HTTPError
@@ -319,22 +363,18 @@ def get_all_product_data():
                 write_log('Connection error occurred', conn_err, product_link[1])
                 continue
             except ConnectionResetError as res_err:
-                write_log('Connection error occurred', res_err, product_link[1])
+                write_log('ConnectionResetError error occurred', res_err, product_link[1])
                 continue
             except requests.exceptions.ChunkedEncodingError as con_err:
-                write_log('Connection error occurred', con_err, product_link[1])
+                write_log('ChunkedEncodingError error occurred', con_err, product_link[1])
                 continue
             except requests.exceptions.ReadTimeout as time_err:
                 write_log('Time error occurred', time_err, product_link[1])
                 continue
             except KeyError:
-                print('In link: ', product_link[1], '\nCONTENT - ', resp.content, '\nHEADER - ', resp.headers, '\nSTATUS CODE - ', resp.status_code, '\n')
-                write_log('MY ERROR', resp.content, product_link[1])
+                write_log('Bad proxy', resp.headers, product_link[1])
                 continue
-            except MyException:
-                print('In link: ', product_link[1], '\nCONTENT - ', resp.content, '\nHEADER - ', resp.headers['Content-Length'], '\nSTATUS CODE - ', resp.status_code, '\n')
-                write_log('MY ERROR', resp.content, product_link[1])
-                continue
+# End pars all products data ******************
 
 
 # read from file
@@ -371,12 +411,11 @@ def main():
     start = datetime.now()
     print('Start: ', start)
 
-    # base_url = 'http://www.i28.com/jordan-%E4%B9%94%E4%B8%B9-c-995/'
-    # get_category_top(base_url)
+    get_category_links()
 
-    # get_category_products()
+    get_subcategory_links()
 
-    # get_all_product_links()
+    get_all_product_links()
 
     get_all_product_data()
 
