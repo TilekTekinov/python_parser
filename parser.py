@@ -1,5 +1,6 @@
 import csv
 import math
+import os
 
 import requests
 
@@ -54,7 +55,7 @@ def get_category_links():
     while True:
         try:
             resp, proxy = get_html(base_url, proxies)
-            if 13000 >= int(resp.headers['Content-Length']):
+            if 12000 >= int(resp.headers['Content-Length']):
                 raise KeyError
             resp.raise_for_status()
             if 'Bad Request' in resp.text:
@@ -103,13 +104,13 @@ def get_subcategory_link(html, category_link, i, index):
                 data = {'category-link': category_link,
                         'subcategory-link': '',
                         'subcategory-name': ''}
-            write_subcategory(data, index, i)
+            write_subcategory(data, index, i, category_link)
             index += 1
     except AttributeError:
         data = {'category-link': category_link,
                 'subcategory-link': '',
                 'subcategory-name': ''}
-        write_subcategory(data, index, i)
+        write_subcategory(data, index, i, category_link)
         index += 1
     return index
 
@@ -122,10 +123,10 @@ def get_subcategory_links():
     index = 1
     while True:
         try:
-            if i == len(category_link) - 1:
+            if i == len(category_link):
                 break
             resp, proxy = get_html(category_link[i][2], proxies)
-            if 13000 >= int(resp.headers['Content-Length']):
+            if 12000 >= int(resp.headers['Content-Length']):
                 raise KeyError
             resp.raise_for_status()
             if 'Bad Request' in resp.text:
@@ -201,7 +202,7 @@ def get_page_count(subcategory_link):
 
 
 # get product link and price
-def get_product_link(html, index, sub_cat_id):
+def get_product_link(html, index, sub_cat_id, sub_link):
     soup = BeautifulSoup(html, "html.parser")
     prod_info = soup.find_all(class_="product-col")
     for prod_info_one in prod_info:
@@ -222,7 +223,7 @@ def get_product_link(html, index, sub_cat_id):
                 price = ''
         data = {'link': link,
                 'price': price}
-        write_product_list(data, index, sub_cat_id)
+        write_product_list(data, index, sub_cat_id, sub_link)
         index += 1
     return index
 
@@ -247,7 +248,7 @@ def get_product_links(subcategory_link, index, sub_cat_id):
                 resp.raise_for_status()
                 if 'Bad Request' in resp.text:
                     raise requests.HTTPError
-                index = get_product_link(resp.text, index, sub_cat_id)
+                index = get_product_link(resp.text, index, sub_cat_id, subcategory_link)
                 break
             except requests.HTTPError as http_err:
                 if resp.status_code == 403:
@@ -287,7 +288,7 @@ def get_all_product_links():
 
 # Start pars all products data ******************
 # get product name, price, details, size, image link
-def get_product_data(html, product_link, i, index):
+def get_product_data(html, product_link, i, index, link):
     soup = BeautifulSoup(html, "html.parser")
     detail, size, image = [], [], []
     try:
@@ -328,7 +329,7 @@ def get_product_data(html, product_link, i, index):
                 'product-id': detail[0],
                 'product-size': size,
                 'product-image': image}
-        write_product_data(data, index, i)
+        write_product_data(data, index, i, link)
     except IndexError:
         data = {'product-link': product_link,
                 'product-name': name,
@@ -338,7 +339,7 @@ def get_product_data(html, product_link, i, index):
                 'product-id': '',
                 'product-size': size,
                 'product-image': image}
-        write_product_data(data, index, i)
+        write_product_data(data, index, i, link)
 
 
 # get product data
@@ -356,12 +357,12 @@ def get_all_product_data():
                     proxies = get_proxies('hideme_proxy.csv')
                     count = 0
                 resp, proxy = get_html(product_link[1], proxies)
-                if 13000 >= int(resp.headers['Content-Length']):
+                if 12000 >= int(resp.headers['Content-Length']):
                     raise KeyError
                 resp.raise_for_status()
                 if 'Bad Request' in resp.text:
                     raise requests.HTTPError
-                get_product_data(resp.text, product_link[1], product_link[3], product_link[0])
+                get_product_data(resp.text, product_link[1], product_link[3], product_link[0], product_link[4])
                 break
             except requests.HTTPError as http_err:
                 if resp.status_code == 403:
@@ -408,19 +409,19 @@ def write_category(data, index):
         writer.writerow((index, data['category-name'], data['category-link']))
 
 
-def write_subcategory(data, index, i):
+def write_subcategory(data, index, i, link):
     with open('subcategory-list-url.csv', 'a') as f:
         writer = csv.writer(f, delimiter=';')
-        writer.writerow((index, data['subcategory-name'], data['subcategory-link'], i))
+        writer.writerow((index, data['subcategory-name'], data['subcategory-link'], i, link))
 
 
-def write_product_list(data, index, i):
+def write_product_list(data, index, i, link):
     with open('product_list_url.csv', 'a') as f:
         writer = csv.writer(f, delimiter=';')
-        writer.writerow((index, data['link'], data['price'], i))
+        writer.writerow((index, data['link'], data['price'], i, link))
 
 
-def write_product_data(data, index, i):
+def write_product_data(data, index, i, link):
     with open('product-list.csv', 'a') as f:
         writer = csv.writer(f, delimiter=';')
         writer.writerow((index,
@@ -432,7 +433,7 @@ def write_product_data(data, index, i):
                          data['product-manufacturer'],
                          data['product-size'],
                          data['product-image'],
-                         i))
+                         i, link))
 
 
 # write log to file
@@ -443,16 +444,33 @@ def write_log(text, err, link):
         writer.writerow((datetime.now(), text, err, link))
 
 
+def clear_category():
+    data = get_csv('category-list-url.csv')
+    write_data = []
+    for row in data:
+        if row[1] in '未分类产品' or row[1] in 'Watch 手表':
+            continue
+        else:
+            write_data.append(row)
+    os.remove('category-list-url.csv')
+    with open('category-list-url.csv', 'a') as f:
+        writer = csv.writer(f, delimiter=';')
+        for i in write_data:
+            writer.writerow(i)
+
+
 def main():
     start = datetime.now()
     print('Start: ', start)
 
-    # get_category_links()
-    #
-    # get_subcategory_links()
-    #
-    # get_all_product_links()
-    #
+    get_category_links()
+
+    clear_category()
+
+    get_subcategory_links()
+
+    get_all_product_links()
+
     get_all_product_data()
 
     end = datetime.now()
