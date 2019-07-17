@@ -321,25 +321,26 @@ def get_product_data(html, product_link, i, index, link):
     except AttributeError:
         image.append('')
     try:
-        data = {'product-link': product_link,
-                'product-name': name,
-                'product-price': price,
-                'product-weight': detail[1],
-                'product-manufacturer': detail[3],
-                'product-id': detail[0],
-                'product-size': size,
-                'product-image': image}
-        write_product_data(data, index, i, link)
+        weight = detail[1]
     except IndexError:
-        data = {'product-link': product_link,
-                'product-name': name,
-                'product-price': price,
-                'product-weight': '',
-                'product-manufacturer': '',
-                'product-id': '',
-                'product-size': size,
-                'product-image': image}
-        write_product_data(data, index, i, link)
+        weight = ''
+    try:
+        manufacturer = detail[3]
+    except IndexError:
+        manufacturer = ''
+    try:
+        product_id = detail[0]
+    except IndexError:
+        product_id = ''
+    data = {'product-link': product_link,
+            'product-name': name,
+            'product-price': price,
+            'product-weight': weight,
+            'product-manufacturer': manufacturer,
+            'product-id': product_id,
+            'product-size': size,
+            'product-image': image}
+    write_product_data(data, index, i, link)
 
 
 # get product data
@@ -388,8 +389,6 @@ def get_all_product_data():
             except KeyError:
                 write_log('Bad proxy', resp.headers, product_link[1])
                 continue
-            except IndexError:
-                get_product_data(resp.text, product_link[1], '', '')
 # End pars all products data ******************
 
 
@@ -403,24 +402,28 @@ def get_csv(file):
     return data
 
 
+# write category data to csv file
 def write_category(data, index):
     with open('category-list-url.csv', 'a') as f:
         writer = csv.writer(f, delimiter=';')
         writer.writerow((index, data['category-name'], data['category-link']))
 
 
+# write subcategory data to csv file
 def write_subcategory(data, index, i, link):
     with open('subcategory-list-url.csv', 'a') as f:
         writer = csv.writer(f, delimiter=';')
         writer.writerow((index, data['subcategory-name'], data['subcategory-link'], i, link))
 
 
+# write product list to csv file
 def write_product_list(data, index, i, link):
     with open('product_list_url.csv', 'a') as f:
         writer = csv.writer(f, delimiter=';')
         writer.writerow((index, data['link'], data['price'], i, link))
 
 
+# write product data to csv file
 def write_product_data(data, index, i, link):
     with open('product-list.csv', 'a') as f:
         writer = csv.writer(f, delimiter=';')
@@ -444,6 +447,7 @@ def write_log(text, err, link):
         writer.writerow((datetime.now(), text, err, link))
 
 
+# clear not needed category
 def clear_category(dont_pars):
     data = get_csv('category-list-url.csv')
     write_data = []
@@ -465,7 +469,7 @@ def main():
 
     get_category_links()
 
-    dont_pars = ['未分类产品', 'Watch 手表']
+    dont_pars = ['未分类产品', 'Watch 手表']       # add to this list the categories that do not need to be parsed
     clear_category(dont_pars)
 
     get_subcategory_links()
