@@ -173,7 +173,10 @@ def get_page_count(subcategory_link):
             if 'Bad Request' in resp.text:
                 raise requests.HTTPError
             soup = BeautifulSoup(resp.text, "html.parser")
-            page_count = soup.find(attrs={'class': 'displaying hidden-xs'}).contents[5].contents
+            try:
+                page_count = soup.find(attrs={'class': 'displaying hidden-xs'}).contents[5].contents
+            except AttributeError:
+                return 0
             return int(page_count[0])
         except requests.HTTPError as http_err:
             if resp.status_code == 403:
@@ -231,6 +234,12 @@ def get_product_link(html, index, sub_cat_id, sub_link):
 # get product from all subcategories page
 def get_product_links(subcategory_link, index, sub_cat_id):
     all_page = get_page_count(subcategory_link)
+    if not all_page:
+        data = {'link': subcategory_link,
+                'price': ''}
+        write_product_list(data, index, sub_cat_id, subcategory_link)
+        index += 1
+        return index
     proxies = get_proxies('hideme_proxy.csv')
     sum_proxies = len(list(get_proxies('hideme_proxy.csv')))
     count = 0
