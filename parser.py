@@ -444,11 +444,11 @@ def write_log(text, err, link):
         writer.writerow((datetime.now(), text, err, link))
 
 
-def clear_category():
+def clear_category(dont_pars):
     data = get_csv('category-list-url.csv')
     write_data = []
     for row in data:
-        if row[1] in '未分类产品' or row[1] in 'Watch 手表':
+        if row[1] in dont_pars or row[1] in dont_pars:
             continue
         else:
             write_data.append(row)
@@ -465,7 +465,8 @@ def main():
 
     get_category_links()
 
-    clear_category()
+    dont_pars = ['未分类产品', 'Watch 手表']
+    clear_category(dont_pars)
 
     get_subcategory_links()
 
